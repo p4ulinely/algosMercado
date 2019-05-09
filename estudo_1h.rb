@@ -9,7 +9,7 @@ class Dia
 		@max = max1h #maxima do dia
 		@min = min1h #minnima do dia
 		@vlt = @vlt1h #volatilidade do dia
-		@qntCandles = 1
+		@qntCandles = 1 #quantidade de candles do dia
 
 		######## para analise da primeira hora
 		@passouDaMax1h = false
@@ -20,17 +20,26 @@ class Dia
 	def getDia
 		@dia	
 	end
-
 	def getVolume
 		@vol	
 	end
-
+	def getVolatilidade
+		@vlt
+	end
+	def getVolume1h
+		@vol1h	
+	end
+	def getVolatilidade1h
+		@vlt1h
+	end
 	def getQntCandles
 		@qntCandles
 	end
-
 	def passouPrimeiraHora
 		[@passouDaMax1h, @passouDaMin1h]
+	end
+	def vltPassou1h
+		[@vltPassouMax1h, @vltPassouMin1h]
 	end
 
 	def addCandle(max, min, vol)
@@ -60,6 +69,10 @@ class Dia
 
 		# nova volatilidade
 		@vlt = @max - @min
+
+		# quantidade de pontos que passou de 1h
+		@vltPassouMax1h = @max - @max1h
+		@vltPassouMin1h = @min - @min1h
 	end
 end #classe Dia
 
@@ -131,52 +144,50 @@ end
 
 def candle(repositorio, candle, i_candle, tipo)
 
-	# csv do profit
-	if tipo == 1
+	# tipo 1 e' csv do profit
+	# tipo 2 e' csv da api
 
-		# if @diaTemp == nil
-		# 	horaInicial = "09:00:00"
-		# else
-			
-		# end
-		horaInicial = "09:00:00"
-		horaCandle = candle[i_candle][2]
-
-	# csv api
-	else
-		horaInicial = "11:00:00"
-		horaCandle = candle[i_candle][7].split(' ')[1].gsub('"', '')
-	end
-
-	# primeira hora
-	if horaCandle == horaInicial
-
-		# if i_candle != candle.length-1
-		# 	puts i_candle
-		# 	puts @diaTemp.getQntCandles
-		# end
-
-		if @diaTemp != nil # para evitar um push no primeiro candle do csv
-			puts @diaTemp.getQntCandles
-			repositorio.push(@diaTemp)
-			@controle += 1
-		end
+	# para primeira linha
+	if @diaTemp == nil
 
 		if tipo == 1
 			@diaTemp = Dia.new(candle[i_candle][1], candle[i_candle][4], candle[i_candle][5], candle[i_candle][8])
 		else
 			@diaTemp = Dia.new(candle[i_candle][7].split(' ')[0].gsub('"', ''), candle[i_candle][2], candle[i_candle][3], candle[i_candle][5])
 		end
-	# demais horas
+
+	# 
 	else
 
+		# determinar o dia corrente
 		if tipo == 1
-			@diaTemp.addCandle(candle[i_candle][4], candle[i_candle][5], candle[i_candle][8])
+			diaCandle = candle[i_candle][1]
 		else
-			@diaTemp.addCandle(candle[i_candle][2], candle[i_candle][3], candle[i_candle][5])
+			diaCandle = candle[i_candle][7].split(' ')[0].gsub('"', '')
 		end
-		
-		# quando chega no ultimo candle do csv, adiciona os dados do dia corrente
+
+		# compara o dia corrente com o dia na classe
+		if diaCandle != @diaTemp.getDia
+			# puts diaCandle
+			# exit
+			repositorio.push(@diaTemp)
+			
+			if tipo == 1
+				@diaTemp = Dia.new(candle[i_candle][1], candle[i_candle][4], candle[i_candle][5], candle[i_candle][8])
+			else
+				@diaTemp = Dia.new(candle[i_candle][7].split(' ')[0].gsub('"', ''), candle[i_candle][2], candle[i_candle][3], candle[i_candle][5])
+			end
+		else
+
+			if tipo == 1
+				@diaTemp.addCandle(candle[i_candle][4], candle[i_candle][5], candle[i_candle][8])
+			else
+				@diaTemp.addCandle(candle[i_candle][2], candle[i_candle][3], candle[i_candle][5])
+			end
+			
+		end
+
+		# para a ultima linha
 		if tipo == 1
 			if i_candle == 0
 				repositorio.push(@diaTemp)
@@ -203,7 +214,6 @@ def repositorioDias(arquivo, tipo=1)
 	#csv api
 	else
 		for linha_arquivo in (0..arquivo.length-1)
-			# print "#{linha_arquivo} "
 			candle(arrTemp, arquivo, linha_arquivo, tipo)
 		end #for
 	end
@@ -211,43 +221,71 @@ def repositorioDias(arquivo, tipo=1)
 	return arrTemp
 end # def repositorioDias(
 
-file = lerArquivo("dolfut.txt")
-repo = repositorioDias(file)
-# file = lerArquivo("organizado.csv", 2)
-# repo = repositorioDias(file, 2)
-# puts repo[30].getQntCandles
-# puts @controle
+# file = lerArquivo("dolfut.txt")
+# repo = repositorioDias(file)
 
-############# analise
-max1h, min1h, ambos, nenhum = 0, 0, 0, 0
-t = repo.length
+# file = lerArquivo("organizado18.csv", 2)
+# repo = repositorioDias(file, 2)
+
+file = lerArquivo("organizado19.csv", 2)
+repo = repositorioDias(file, 2)
+
+############################################################### analise
+t, max1h, min1h, ambos, nenhum = 0, 0, 0, 0, 0
+mediaVolMin, mediaVolMax, mediaVolAmbos = 0.0, 0.0, 0.0
+mediaVltMin, mediaVltMax, mediaVltAmbos = 0.0, 0.0, 0.0
+mediaVolMin1h, mediaVolMax1h, mediaVolAmbos1h = 0.0, 0.0, 0.0
+mediaVltMin1h, mediaVltMax1h, mediaVltAmbos1h = 0.0, 0.0, 0.0
+
 
 repo.each do |dia|
 
-	# max1h
-	if dia.passouPrimeiraHora[0] && dia.passouPrimeiraHora[1] == false
-		max1h += 1
-	end
+	#dias com, pelo menos 9hrs de negociacao
+	if dia.getQntCandles > 8
+	# if dia.getQntCandles < 9
 
-	if dia.passouPrimeiraHora[1] && dia.passouPrimeiraHora[0] == false
-		min1h += 1
-	end
+		t += 1	
 
-	if dia.passouPrimeiraHora[0] && dia.passouPrimeiraHora[1]
-		ambos += 1
-	end
+		# max1h
+		if dia.passouPrimeiraHora[0] && dia.passouPrimeiraHora[1] == false
+			mediaVolMax += dia.getVolume
+			mediaVolMax1h += dia.getVolume1h
+			mediaVltMax += dia.getVolatilidade
+			mediaVltMax1h += dia.getVolatilidade1h
+			max1h += 1
+		end
 
-	if !dia.passouPrimeiraHora[0] && !dia.passouPrimeiraHora[1]
-		nenhum += 1
+		if dia.passouPrimeiraHora[1] && dia.passouPrimeiraHora[0] == false
+			mediaVolMin += dia.getVolume
+			mediaVolMin1h += dia.getVolume1h
+			mediaVltMin += dia.getVolatilidade
+			mediaVltMin1h += dia.getVolatilidade1h
+			min1h += 1
+		end
+
+		if dia.passouPrimeiraHora[0] && dia.passouPrimeiraHora[1]
+			# print "#{dia.vltPassou1h[0]} #{dia.vltPassou1h[1]}, "
+			print "#{dia.vltPassou1h[0] + dia.vltPassou1h[1]}, "
+			mediaVolAmbos += dia.getVolume
+			mediaVolAmbos1h += dia.getVolume1h
+			mediaVltAmbos += dia.getVolatilidade
+			mediaVltAmbos1h += dia.getVolatilidade1h
+			ambos += 1
+		end
+
+		if !dia.passouPrimeiraHora[0] && !dia.passouPrimeiraHora[1]
+			nenhum += 1
+		end
 	end
-end
+end # each
 
 puts "\nresultado: para #{t} dias"
 
-print "max1h: #{(max1h/t.to_f)*100} (#{max1h})\n"
-print "min1h: #{(min1h/t.to_f)*100} (#{min1h})\n"
-print "ambos: #{(ambos/t.to_f)*100} (#{ambos})\n"
-print "nenhum: #{(nenhum/t.to_f)*100} (#{nenhum})\n"
+print "max1h: #{((max1h/t.to_f)*100).round(2)} (#{max1h}) | med vol: #{(mediaVolMax/max1h).to_i} | med vlt: #{(mediaVltMax/max1h).round(2)} | med vol1h: #{(mediaVolMax1h/max1h).to_i} | med vlt1h: #{(mediaVltMax1h/max1h).round(2)}\n"
+print "min1h: #{((min1h/t.to_f)*100).round(2)} (#{min1h}) | med vol: #{(mediaVolMin/min1h).to_i} | med vlt: #{(mediaVltMin/min1h).round(2)} | med vol1h: #{(mediaVolMin1h/min1h).to_i} | med vlt1h: #{(mediaVltMin1h/min1h).round(2)}\n"
+print "ambos: #{((ambos/t.to_f)*100).round(2)} (#{ambos}) | med vol: #{(mediaVolAmbos/ambos).to_i} | med vlt: #{(mediaVltAmbos/ambos).round(2)} | med vol1h: #{(mediaVolAmbos1h/ambos).to_i} | med vlt1h: #{(mediaVltAmbos1h/ambos).round(2)}\n"
+print "nenhum: #{((nenhum/t.to_f)*100).round(2)} (#{nenhum})\n"
 print "\tapenas um lado: #{((max1h+min1h)/t.to_f)*100} (#{(max1h+min1h)})\n"
+puts "---------------------------------------------------"
 ############# analise
 
